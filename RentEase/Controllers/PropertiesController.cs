@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using RentEase.Data;
 using RentEase.DTOs;
 using RentEase.Models;
@@ -11,15 +13,25 @@ namespace RentEase.Controllers;
 public class PropertiesController : ControllerBase
 {
     private readonly RentEaseDbContext _context;
+    private readonly IDistributedCache _cache;
+    private const string PropertiesCacheKey = "properties_all";
 
-    public PropertiesController(RentEaseDbContext context)
+    public PropertiesController(RentEaseDbContext context, IDistributedCache cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<PropertyResponseDto>>> GetAll(CancellationToken ct)
     {
+        var cachedData = await _cache.GetStringAsync(PropertiesCacheKey, ct);
+        if (!string.IsNullOrEmpty(cachedData))
+        {
+            var cachedProperties = JsonSerializer.Deserialize<List<PropertyResponseDto>>(cachedData);
+            return Ok(cachedProperties);
+        }
+
         var properties = await _context.Properties
             .AsNoTracking()
             .Include(p => p.Images)
@@ -40,6 +52,14 @@ public class PropertiesController : ControllerBase
                 p.Images.Select(img => new PropertyImageDto(img.Id, img.FileUrl, img.FileName, img.FileSizeBytes, img.IsPrimary)).ToList()
             ))
             .ToListAsync(ct);
+
+        var options = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+        };
+
+        var serializedData = JsonSerializer.Serialize(properties);
+        await _cache.SetStringAsync(PropertiesCacheKey, serializedData, options, ct);
 
         return Ok(properties);
     }
@@ -110,6 +130,8 @@ public class PropertiesController : ControllerBase
         _context.Properties.Add(property);
         await _context.SaveChangesAsync(ct);
 
+        await _cache.RemoveAsync(PropertiesCacheKey, ct);
+
         return CreatedAtAction(nameof(GetById), new { id = property.Id }, new PropertyResponseDto(
             property.Id,
             property.OwnerId,
@@ -144,6 +166,9 @@ public class PropertiesController : ControllerBase
         property.City = dto.City;
 
         await _context.SaveChangesAsync(ct);
+
+        await _cache.RemoveAsync(PropertiesCacheKey, ct);
+
         return NoContent();
     }
 
@@ -156,6 +181,8 @@ public class PropertiesController : ControllerBase
 
         _context.Properties.Remove(property);
         await _context.SaveChangesAsync(ct);
+
+        await _cache.RemoveAsync(PropertiesCacheKey, ct);
 
         return NoContent();
     }
