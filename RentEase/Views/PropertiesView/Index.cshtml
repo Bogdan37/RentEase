@@ -1,4 +1,5 @@
-﻿@model IEnumerable<RentEase.Models.Property>
+﻿
+@model IEnumerable<RentEase.Models.Property>
 
 <!DOCTYPE html>
 <html lang="uk">
@@ -48,7 +49,8 @@
                     <td>@item.PricePerMonth грн</td>
                     <td>@item.RoomsCount</td>
                     <td>
-                        <form asp-action="Delete" asp-route-id="@item.Id" method="post" style="display:inline;">
+                        <form action="/PropertiesView/Delete/@item.Id" method="post" style="display:inline;">
+                            <input type="hidden" name="id" value="@item.Id" />
                             <button type="submit" class="btn-danger" onclick="return confirm('Видалити?');">Видалити</button>
                         </form>
                     </td>
