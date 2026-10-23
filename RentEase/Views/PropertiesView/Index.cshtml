@@ -1,0 +1,60 @@
+﻿@model IEnumerable<RentEase.Models.Property>
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8" />
+    <title>Нерухомість</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f4f4f4; }
+        .btn { padding: 6px 12px; text-decoration: none; background: #2563eb; color: white; border-radius: 4px; display: inline-block; }
+        .btn-danger { background: #dc2626; border: none; color: white; padding: 6px 10px; cursor: pointer; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Каталог нерухомості</h1>
+    <a href="/PropertiesView/Create" class="btn">+ Додати новий об'єкт</a>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Фото (посилання на файл)</th>
+                <th>Назва</th>
+                <th>Місто / Адреса</th>
+                <th>Ціна / міс.</th>
+                <th>Кімнат</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>
+                        @if (item.Images.Any())
+                        {
+                            <a href="@item.Images.First().FileUrl" target="_blank">Переглянути фото</a>
+                        }
+                        else
+                        {
+                            <span>Немає фото</span>
+                        }
+                    </td>
+                    <td>@item.Title</td>
+                    <td>@item.City, @item.Address</td>
+                    <td>@item.PricePerMonth грн</td>
+                    <td>@item.RoomsCount</td>
+                    <td>
+                        <form asp-action="Delete" asp-route-id="@item.Id" method="post" style="display:inline;">
+                            <button type="submit" class="btn-danger" onclick="return confirm('Видалити?');">Видалити</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</body>
+</html>
