@@ -1,0 +1,54 @@
+﻿@{
+    var property = ViewBag.Property as RentEase.Models.Property;
+    var users = ViewBag.Users as List<RentEase.Models.User> ?? new List<RentEase.Models.User>();
+    ViewData["Title"] = "Бронювання житла";
+}
+
+<div class="container mt-4" style="max-width: 500px; margin: 2rem auto; font-family: sans-serif;">
+    <h2>Бронювання: @property?.Title</h2>
+    <p style="color: #666;">
+        Місто: @property?.City, @property?.Address<br />
+        Ціна: @property?.PricePerMonth грн/міс
+    </p>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div style="background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 1rem;">
+            <ul style="margin: 0; padding-left: 20px;">
+                @foreach (var modelError in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <li>@modelError.ErrorMessage</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form action="/PropertiesView/Book/@property?.Id" method="post">
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-weight: bold; margin-bottom: 4px;">Оберіть користувача (хто бронює):</label>
+            <select name="clientId" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;" required>
+                @foreach (var user in users)
+                {
+                    <option value="@user.Id">
+                        @user.FullName (@user.Email) @(user.Id == property?.OwnerId ? "— [ВЛАСНИК]" : "")
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-weight: bold; margin-bottom: 4px;">Дата заїзду:</label>
+            <input type="date" name="startDate" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;" required />
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-weight: bold; margin-bottom: 4px;">Дата виїзду:</label>
+            <input type="date" name="endDate" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;" required />
+        </div>
+
+        <button type="submit" style="background: #16a34a; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer;">
+            Підтвердити бронювання
+        </button>
+        <a href="/PropertiesView" style="margin-left: 10px; color: #4b5563; text-decoration: none;">Скасувати</a>
+    </form>
+</div>

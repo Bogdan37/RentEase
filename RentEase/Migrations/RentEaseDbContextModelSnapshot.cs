@@ -232,7 +232,7 @@ namespace RentEase.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("TenantId")
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -308,9 +308,13 @@ namespace RentEase.Migrations
 
             modelBuilder.Entity("RentEase.Models.User", b =>
                 {
-                    b.HasOne("RentEase.Models.Tenant", null)
+                    b.HasOne("RentEase.Models.Tenant", "Tenant")
                         .WithMany("Users")
-                        .HasForeignKey("TenantId");
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("RentEase.Models.Property", b =>
