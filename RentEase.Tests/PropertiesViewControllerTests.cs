@@ -34,7 +34,6 @@ public class PropertiesViewControllerTests
     [Fact]
     public async Task Index_ReturnsViewResult_WithListOfProperties()
     {
-
         using var context = GetDatabaseContext();
         var mockCache = CreateMockCache();
 
@@ -65,7 +64,6 @@ public class PropertiesViewControllerTests
     [Fact]
     public async Task Create_ValidProperty_AddsToDatabase_AndRedirectsToIndex()
     {
-
         using var context = GetDatabaseContext();
         var mockCache = CreateMockCache();
 
@@ -119,7 +117,6 @@ public class PropertiesViewControllerTests
     [Fact]
     public async Task Create_WhenModelIsInvalid_ReturnsViewResultWithSameModel()
     {
-
         using var context = GetDatabaseContext();
         var mockCache = CreateMockCache();
         var controller = new PropertiesViewController(context, mockCache.Object);
@@ -128,7 +125,7 @@ public class PropertiesViewControllerTests
 
         var invalidProperty = new Property();
 
-        var result = await controller.Create(invalidProperty, null);
+        var result = await controller.Create(invalidProperty, string.Empty);
 
         var viewResult = result.Should().BeOfType<ViewResult>().Subject;
         viewResult.Model.Should().Be(invalidProperty);
@@ -165,5 +162,161 @@ public class PropertiesViewControllerTests
 
         (await context.Properties.FindAsync(propertyId)).Should().BeNull();
         mockCache.Verify(c => c.RemoveAsync("properties_all", default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Book_ValidData_CreatesBooking_AndRedirectsToIndex()
+    {
+        using var context = GetDatabaseContext();
+        var mockCache = CreateMockCache();
+
+        var ownerId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var propertyId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+
+        var property = new Property
+        {
+            Id = propertyId,
+            TenantId = tenantId,
+            OwnerId = ownerId,
+            Title = "Затишна квартира",
+            City = "Київ",
+            Address = "Хрещатик, 1",
+            PricePerMonth = 30000m,
+            RoomsCount = 1
+        };
+        context.Properties.Add(property);
+        await context.SaveChangesAsync();
+
+        var controller = new PropertiesViewController(context, mockCache.Object);
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+        var endDate = startDate.AddDays(3);
+
+        var result = await controller.Book(propertyId, clientId, startDate, endDate);
+
+        var redirect = result.Should().BeOfType<RedirectToActionResult>().Subject;
+        redirect.ActionName.Should().Be(nameof(PropertiesViewController.Index));
+
+        var booking = await context.BookingRequests.FirstOrDefaultAsync();
+        booking.Should().NotBeNull();
+        booking!.PropertyId.Should().Be(propertyId);
+        booking.ClientId.Should().Be(clientId);
+        booking.Status.Should().Be(BookingStatus.Pending);
+        booking.TotalPrice.Should().Be(3000m);
+    }
+
+    [Fact]
+    public async Task Book_WhenOwnerTriesToBookOwnProperty_ReturnsError()
+    {
+        using var context = GetDatabaseContext();
+        var mockCache = CreateMockCache();
+
+        var ownerId = Guid.NewGuid();
+        var propertyId = Guid.NewGuid();
+
+        var property = new Property
+        {
+            Id = propertyId,
+            OwnerId = ownerId,
+            Title = "Власна квартира",
+            City = "Київ",
+            Address = "вул. Франка, 10",
+            PricePerMonth = 15000m,
+            RoomsCount = 1
+        };
+        context.Properties.Add(property);
+        await context.SaveChangesAsync();
+
+        var controller = new PropertiesViewController(context, mockCache.Object);
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+        var endDate = startDate.AddDays(2);
+
+        var result = await controller.Book(propertyId, ownerId, startDate, endDate);
+
+        result.Should().BeOfType<ViewResult>();
+        controller.ModelState.IsValid.Should().BeFalse();
+        controller.ModelState[string.Empty]!.Errors.Should().Contain(e => e.ErrorMessage.Contains("Власник не може забронювати"));
+        (await context.BookingRequests.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Book_WhenDatesConflict_ReturnsError()
+    {
+        using var context = GetDatabaseContext();
+        var mockCache = CreateMockCache();
+
+        var ownerId = Guid.NewGuid();
+        var client1Id = Guid.NewGuid();
+        var client2Id = Guid.NewGuid();
+        var propertyId = Guid.NewGuid();
+
+        var property = new Property
+        {
+            Id = propertyId,
+            OwnerId = ownerId,
+            Title = "Студія",
+            City = "Київ",
+            Address = "Борщагівська, 1",
+            PricePerMonth = 15000m,
+            RoomsCount = 1
+        };
+        context.Properties.Add(property);
+
+        var existingBooking = new BookingRequest
+        {
+            Id = Guid.NewGuid(),
+            PropertyId = propertyId,
+            ClientId = client1Id,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(15)),
+            Status = BookingStatus.Pending,
+            TotalPrice = 2500m
+        };
+        context.BookingRequests.Add(existingBooking);
+        await context.SaveChangesAsync();
+
+        var controller = new PropertiesViewController(context, mockCache.Object);
+
+        var conflictStart = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12));
+        var conflictEnd = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(17));
+
+        var result = await controller.Book(propertyId, client2Id, conflictStart, conflictEnd);
+
+        result.Should().BeOfType<ViewResult>();
+        controller.ModelState.IsValid.Should().BeFalse();
+        controller.ModelState[string.Empty]!.Errors.Should().Contain(e => e.ErrorMessage.Contains("вже заброньовано"));
+        (await context.BookingRequests.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Book_WhenStartDateIsAfterEndDate_ReturnsError()
+    {
+        using var context = GetDatabaseContext();
+        var mockCache = CreateMockCache();
+
+        var propertyId = Guid.NewGuid();
+        var property = new Property
+        {
+            Id = propertyId,
+            OwnerId = Guid.NewGuid(),
+            Title = "Студія",
+            City = "Київ",
+            Address = "вул. Польова, 2",
+            PricePerMonth = 15000m,
+            RoomsCount = 1
+        };
+        context.Properties.Add(property);
+        await context.SaveChangesAsync();
+
+        var controller = new PropertiesViewController(context, mockCache.Object);
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5));
+        var endDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2));
+
+        var result = await controller.Book(propertyId, Guid.NewGuid(), startDate, endDate);
+
+        result.Should().BeOfType<ViewResult>();
+        controller.ModelState.IsValid.Should().BeFalse();
+        controller.ModelState[string.Empty]!.Errors.Should().Contain(e => e.ErrorMessage.Contains("раніше дати завершення"));
     }
 }
