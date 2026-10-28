@@ -98,14 +98,15 @@ public class PropertiesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PropertyResponseDto>> Create([FromBody] CreatePropertyDto dto, CancellationToken ct)
     {
-        var ownerExists = await _context.Users.AnyAsync(u => u.Id == dto.OwnerId, ct);
-        if (!ownerExists)
+        var owner = await _context.Users.FirstOrDefaultAsync(u => u.Id == dto.OwnerId, ct);
+        if (owner == null)
         {
             return BadRequest($"Користувача з ID {dto.OwnerId} не знайдено.");
         }
 
         var property = new Property
         {
+            TenantId = owner.TenantId, 
             OwnerId = dto.OwnerId,
             Title = dto.Title,
             Description = dto.Description,
