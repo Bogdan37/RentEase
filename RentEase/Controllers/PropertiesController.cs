@@ -22,47 +22,80 @@ public class PropertiesController : ControllerBase
         _cache = cache;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<PropertyResponseDto>>> GetAll(CancellationToken ct)
+[HttpGet]
+public async Task<ActionResult<PagedResult<PropertyResponseDto>>> GetAll(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10,
+    CancellationToken ct = default)
+{
+    if (page < 1) page = 1;
+    if (pageSize < 1) pageSize = 10;
+    if (pageSize > 100) pageSize = 100;
+
+    var cacheKey = $"properties_page_{page}_size_{pageSize}";
+
+    var cachedData = await _cache.GetStringAsync(cacheKey, ct);
+    if (!string.IsNullOrEmpty(cachedData))
     {
-        var cachedData = await _cache.GetStringAsync(PropertiesCacheKey, ct);
-        if (!string.IsNullOrEmpty(cachedData))
+        var cachedResult = JsonSerializer.Deserialize<PagedResult<PropertyResponseDto>>(cachedData);
+        if (cachedResult != null)
         {
-            var cachedProperties = JsonSerializer.Deserialize<List<PropertyResponseDto>>(cachedData);
-            return Ok(cachedProperties);
+            return Ok(cachedResult);
         }
-
-        var properties = await _context.Properties
-            .AsNoTracking()
-            .Include(p => p.Images)
-            .Select(p => new PropertyResponseDto(
-                p.Id,
-                p.OwnerId,
-                p.Title,
-                p.Description,
-                p.Type,
-                p.PricePerMonth,
-                p.AreaSqM,
-                p.RoomsCount,
-                p.Latitude,
-                p.Longitude,
-                p.Address,
-                p.City,
-                p.CreatedAt,
-                p.Images.Select(img => new PropertyImageDto(img.Id, img.FileUrl, img.FileName, img.FileSizeBytes, img.IsPrimary)).ToList()
-            ))
-            .ToListAsync(ct);
-
-        var options = new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
-        };
-
-        var serializedData = JsonSerializer.Serialize(properties);
-        await _cache.SetStringAsync(PropertiesCacheKey, serializedData, options, ct);
-
-        return Ok(properties);
     }
+
+    var totalCount = await _context.Properties.CountAsync(ct);
+
+    var items = await _context.Properties
+        .AsNoTracking()
+        .OrderByDescending(p => p.CreatedAt)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(p => new PropertyResponseDto(
+            p.Id,
+            p.OwnerId,
+            p.Title,
+            p.Description,
+            p.Type,
+            p.PricePerMonth,
+            p.AreaSqM,
+            p.RoomsCount,
+            p.Latitude,
+            p.Longitude,
+            p.Address,
+            p.City,
+            p.CreatedAt,
+            p.Images.Select(img => new PropertyImageDto(
+                img.Id, 
+                img.FileUrl, 
+                img.FileName, 
+                img.FileSizeBytes, 
+                img.IsPrimary)).ToList()
+        ))
+        .ToListAsync(ct);
+
+    var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+    var result = new PagedResult<PropertyResponseDto>(
+        Items: items,
+        TotalCount: totalCount,
+        Page: page,
+        PageSize: pageSize,
+        TotalPages: totalPages,
+        HasPreviousPage: page > 1,
+        HasNextPage: page < totalPages
+    );
+
+    var options = new DistributedCacheEntryOptions
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+    };
+
+    var serializedData = JsonSerializer.Serialize(result);
+    await _cache.SetStringAsync(cacheKey, serializedData, options, ct);
+
+    return Ok(result);
+}
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PropertyResponseDto>> GetById(Guid id, CancellationToken ct)
