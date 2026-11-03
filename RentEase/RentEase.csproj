@@ -8,9 +8,11 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
         <PackageReference Include="Lucene.Net" Version="4.8.0-beta00016" />
         <PackageReference Include="Lucene.Net.Analysis.Common" Version="4.8.0-beta00016" />
         <PackageReference Include="Lucene.Net.QueryParser" Version="4.8.0-beta00016" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.21">
           <PrivateAssets>all</PrivateAssets>
@@ -20,6 +22,7 @@
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
         <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
     </ItemGroup>
 
     <ItemGroup>
