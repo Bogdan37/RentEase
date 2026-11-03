@@ -10,11 +10,13 @@
       - ConnectionStrings__Redis=redis:6379
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=rentease_db;Username=postgres;Password=bohdan
+      - ConnectionStrings__RabbitMQ=amqp://guest:guest@rabbitmq:5672
     ports:
       - "8080:8080"
     depends_on:
       - postgres
       - redis
+      - rabbitmq
 
   postgres:
     image: postgres:16-alpine
@@ -35,6 +37,17 @@
     restart: always
     ports:
       - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rentease_rabbitmq
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
 
 volumes:
   postgres_data:

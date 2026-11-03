@@ -8,6 +8,8 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IPropertySearchService, PropertySearchService>();
+builder.Services.AddSingleton<IMessageProducer, RabbitMqProducer>();
+builder.Services.AddHostedService<BookingNotificationConsumer>();
 
 builder.Services.AddDbContext<RentEaseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RentEase.Data;
 using RentEase.DTOs;
 using RentEase.Models;
+using RentEase.Services;
 
 namespace RentEase.Controllers;
 
@@ -12,10 +13,12 @@ namespace RentEase.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly RentEaseDbContext _context;
+    private readonly IMessageProducer _messageProducer;
 
-    public BookingsController(RentEaseDbContext context)
+    public BookingsController(RentEaseDbContext context, IMessageProducer messageProducer)
     {
         _context = context;
+        _messageProducer = messageProducer;
     }
 
     [HttpPost]
@@ -57,7 +60,7 @@ public class BookingsController : ControllerBase
 
         var hasConflict = await _context.BookingRequests.AnyAsync(b =>
             b.PropertyId == dto.PropertyId &&
-            b.Status == BookingStatus.Confirmed &&
+            (b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.Pending) &&
             b.StartDate < dto.EndDate &&
             dto.StartDate < b.EndDate,
             ct);
@@ -85,6 +88,17 @@ public class BookingsController : ControllerBase
         _context.BookingRequests.Add(booking);
         await _context.SaveChangesAsync(ct);
 
+        var bookingEvent = new BookingCreatedEvent(
+            booking.Id,
+            booking.PropertyId,
+            booking.ClientId,
+            booking.StartDate,
+            booking.EndDate,
+            booking.TotalPrice,
+            DateTime.UtcNow
+        );
+        _messageProducer.SendMessage(bookingEvent, "booking_created_queue");
+
         var response = new BookingResponseDto(
             booking.Id,
             booking.TenantId,
@@ -101,27 +115,28 @@ public class BookingsController : ControllerBase
 
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, response);
     }
-    
+
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    [ProducesResponseType(typeof(IEnumerable<BookingResponseDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<BookingResponseDto>>> GetAll(CancellationToken ct)
     {
         var bookings = await _context.BookingRequests
             .AsNoTracking()
             .OrderByDescending(b => b.CreatedAt)
-            .Select(b => new
-            {
+            .Select(b => new BookingResponseDto(
                 b.Id,
+                b.TenantId,
                 b.PropertyId,
-                PropertyTitle = b.Property != null ? b.Property.Title : null,
+                b.Property != null ? b.Property.Title : string.Empty,
                 b.ClientId,
-                ClientName = b.Client != null ? b.Client.FullName : null,
+                b.Client != null ? b.Client.FullName : string.Empty,
                 b.StartDate,
                 b.EndDate,
                 b.TotalPrice,
-                Status = b.Status.ToString(),
+                b.Status.ToString(),
                 b.CreatedAt
-            })
-            .ToListAsync();
+            ))
+            .ToListAsync(ct);
 
         return Ok(bookings);
     }
