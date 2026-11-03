@@ -5,6 +5,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using RentEase.Data;
 using RentEase.DTOs;
 using RentEase.Models;
+using RentEase.Services;
 
 namespace RentEase.Controllers;
 
@@ -15,6 +16,7 @@ public class PropertiesController : ControllerBase
     private readonly RentEaseDbContext _context;
     private readonly IDistributedCache _cache;
     private const string PropertiesCacheKey = "properties_all";
+    private readonly IPropertySearchService _searchService;
 
     public PropertiesController(RentEaseDbContext context, IDistributedCache cache)
     {
@@ -163,6 +165,7 @@ public async Task<ActionResult<PagedResult<PropertyResponseDto>>> GetAll(
 
         _context.Properties.Add(property);
         await _context.SaveChangesAsync(ct);
+        _searchService.IndexProperty(property);
 
         await _cache.RemoveAsync(PropertiesCacheKey, ct);
 
@@ -215,9 +218,51 @@ public async Task<ActionResult<PagedResult<PropertyResponseDto>>> GetAll(
 
         _context.Properties.Remove(property);
         await _context.SaveChangesAsync(ct);
+        _searchService.RemoveProperty(id);
 
         await _cache.RemoveAsync(PropertiesCacheKey, ct);
 
         return NoContent();
+    }
+    
+    [HttpGet("search")]
+    public async Task<ActionResult<IEnumerable<PropertyResponseDto>>> Search(
+        [FromQuery] string q, 
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest("Пошуковий запит не може бути порожнім.");
+
+        var matchedIds = _searchService.Search(q).ToList();
+        if (!matchedIds.Any())
+            return Ok(Enumerable.Empty<PropertyResponseDto>());
+
+        var properties = await _context.Properties
+            .AsNoTracking()
+            .Where(p => matchedIds.Contains(p.Id))
+            .Select(p => new PropertyResponseDto(
+                p.Id,
+                p.OwnerId,
+                p.Title,
+                p.Description,
+                p.Type,
+                p.PricePerMonth,
+                p.AreaSqM,
+                p.RoomsCount,
+                p.Latitude,
+                p.Longitude,
+                p.Address,
+                p.City,
+                p.CreatedAt,
+                p.Images.Select(img => new PropertyImageDto(
+                    img.Id, 
+                    img.FileUrl, 
+                    img.FileName, 
+                    img.FileSizeBytes, 
+                    img.IsPrimary)).ToList()
+            ))
+            .ToListAsync(ct);
+
+        return Ok(properties);
     }
 }

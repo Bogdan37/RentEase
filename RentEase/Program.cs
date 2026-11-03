@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using RentEase.Data;
+using RentEase.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSingleton<IPropertySearchService, PropertySearchService>();
 
 builder.Services.AddDbContext<RentEaseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -17,6 +19,15 @@ builder.Services.AddStackExchangeRedisCache(options =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<RentEaseDbContext>();
+    var searchService = scope.ServiceProvider.GetRequiredService<IPropertySearchService>();
+    
+    var allProperties = db.Properties.AsNoTracking().ToList();
+    searchService.IndexProperties(allProperties);
+}
 
 if (app.Environment.IsDevelopment())
 {
