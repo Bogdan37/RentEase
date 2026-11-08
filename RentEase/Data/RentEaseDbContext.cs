@@ -1,10 +1,19 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RentEase.Models;
+using RentEase.Services;
+
 namespace RentEase.Data;
 
 public class RentEaseDbContext : DbContext
 {
-    public RentEaseDbContext(DbContextOptions<RentEaseDbContext> options) : base(options) { }
+    private readonly ITenantProvider _tenantProvider;
+
+    public RentEaseDbContext(
+        DbContextOptions<RentEaseDbContext> options,
+        ITenantProvider tenantProvider) : base(options)
+    {
+        _tenantProvider = tenantProvider;
+    }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
@@ -16,6 +25,16 @@ public class RentEaseDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+
+        modelBuilder.Entity<Property>()
+            .HasQueryFilter(p => _tenantProvider.CurrentTenantId == null || p.TenantId == _tenantProvider.CurrentTenantId);
+
+        modelBuilder.Entity<BookingRequest>()
+            .HasQueryFilter(b => _tenantProvider.CurrentTenantId == null || b.TenantId == _tenantProvider.CurrentTenantId);
+
+        modelBuilder.Entity<User>()
+            .HasQueryFilter(u => _tenantProvider.CurrentTenantId == null || u.TenantId == _tenantProvider.CurrentTenantId);
 
         modelBuilder.Entity<Property>()
             .HasOne(p => p.Tenant)

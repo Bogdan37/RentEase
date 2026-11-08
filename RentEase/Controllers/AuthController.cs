@@ -27,9 +27,7 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Авторизація через Google OAuth2 ID Token (Пункт C16)
-    /// </summary>
+
     [HttpPost("google")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -38,7 +36,6 @@ public class AuthController : ControllerBase
         GoogleJsonWebSignature.Payload payload;
         try
         {
-            // Валідація токена напряму через сервери Google
             payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken);
         }
         catch (InvalidJwtException ex)
@@ -79,9 +76,7 @@ public class AuthController : ControllerBase
             DateTime.UtcNow.AddMinutes(120)));
     }
 
-    /// <summary>
-    /// Демо-вхід за email для швидкої генерації JWT у Swagger UI
-    /// </summary>
+
     [HttpPost("demo-login")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

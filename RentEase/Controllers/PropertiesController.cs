@@ -121,7 +121,8 @@ public class PropertiesController : ControllerBase
 
         return Ok(result);
     }
-
+    
+    [Authorize]
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(PropertyResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -6,10 +7,15 @@ using Microsoft.OpenApi.Models;
 using RentEase.Data;
 using RentEase.Services;
 
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -17,11 +23,12 @@ builder.Services.AddSwaggerGen(c =>
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "Введіть JWT токен у такому форматі: Bearer {ваш_токен}",
         Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Description = "Вставте JWT-токен без префікса Bearer."
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -78,6 +85,38 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+            Console.WriteLine($"[JWT Event] Отримано заголовок: {authHeader ?? "<порожньо>"}");
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[JWT Error] Помилка валідації: {context.Exception.Message}");
+            Console.ResetColor();
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("[JWT Success] Токен успішно підтверджено!");
+            foreach (var claim in context.Principal?.Claims ?? Enumerable.Empty<System.Security.Claims.Claim>())
+            {
+                Console.WriteLine($"  -> Claim: {claim.Type} = {claim.Value}");
+            }
+            Console.ResetColor();
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            Console.WriteLine($"[JWT Challenge] Виклик автентифікації: {context.Error}, {context.ErrorDescription}");
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddAuthorization();
@@ -89,7 +128,11 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<RentEaseDbContext>();
     var searchService = scope.ServiceProvider.GetRequiredService<IPropertySearchService>();
     
-    var allProperties = db.Properties.AsNoTracking().ToList();
+    var allProperties = db.Properties
+        .IgnoreQueryFilters()
+        .AsNoTracking()
+        .ToList();
+
     searchService.IndexProperties(allProperties);
 }
 
