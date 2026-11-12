@@ -37,7 +37,7 @@ public class AuthController : ControllerBase
         {
             payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken);
         }
-        catch (InvalidJwtException ex)
+        catch (Exception ex)
         {
             _logger.LogWarning("Невалідний Google токен: {Message}", ex.Message);
             return BadRequest("Невалідний Google ID Token");
