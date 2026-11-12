@@ -1,0 +1,296 @@
+{
+  "info": {
+    "_postman_id": "dc8c7190-a391-45b0-8bb6-1590d72acca0",
+    "name": "RentEase - QA1 (Web API Automated CRUD)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52394195"
+  },
+  "item": [
+    {
+      "name": "0. Setup: Demo Login & Extract Token + UserId",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Login successful (200 OK)\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "pm.test(\"Token and UserId received\", function () {",
+              "    pm.expect(data).to.have.property('token');",
+              "    pm.expect(data).to.have.property('userId');",
+              "});",
+              "",
+              "pm.collectionVariables.set(\"jwt_token\", data.token);",
+              "pm.collectionVariables.set(\"user_id\", data.userId);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{user_email}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/Auth/demo-login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "Auth",
+            "demo-login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "1. [POST] Create New Property",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Property created successfully (201 Created)\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const jsonData = pm.response.json();",
+              "pm.test(\"Response contains generated ID and Title\", function () {",
+              "    pm.expect(jsonData).to.have.property('id');",
+              "    pm.expect(jsonData.title).to.eql('QA1 Automated Test Apartment');",
+              "});",
+              "",
+              "pm.collectionVariables.set(\"created_property_id\", jsonData.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ownerId\": \"{{user_id}}\",\n  \"title\": \"QA1 Automated Test Apartment\",\n  \"description\": \"Created automatically by Postman QA1 suite\",\n  \"type\": 0,\n  \"pricePerMonth\": 18500,\n  \"areaSqM\": 54.5,\n  \"roomsCount\": 2,\n  \"latitude\": 50.4501,\n  \"longitude\": 30.5234,\n  \"address\": \"вул. Хрещатик, 1\",\n  \"city\": \"Київ\",\n  \"images\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/Properties",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "Properties"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. [GET] Read Created Property by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const jsonData = pm.response.json();",
+              "pm.test(\"Returned property matches created ID and Price\", function () {",
+              "    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get(\"created_property_id\"));",
+              "    pm.expect(jsonData.pricePerMonth).to.eql(18500);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/Properties/{{created_property_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "Properties",
+            "{{created_property_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. [PUT] Update Property Price & Title",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Property updated (204 No Content)\", function () {",
+              "    pm.response.to.have.status(204);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"QA1 Updated Luxury Apartment\",\n  \"description\": \"Updated via automated test\",\n  \"pricePerMonth\": 22000,\n  \"areaSqM\": 60.0,\n  \"roomsCount\": 2,\n  \"address\": \"вул. Хрещатик, 1\",\n  \"city\": \"Київ\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/Properties/{{created_property_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "Properties",
+            "{{created_property_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. [DELETE] Delete Test Property",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Property deleted (204 No Content)\", function () {",
+              "    pm.response.to.have.status(204);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/Properties/{{created_property_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "Properties",
+            "{{created_property_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. [GET] Verify Property Deleted (Expect 404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Deleted property returns 404 Not Found\", function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/Properties/{{created_property_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "Properties",
+            "{{created_property_id}}"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5261"
+    },
+    {
+      "key": "user_email",
+      "value": "owner.bohdan@example.com"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    },
+    {
+      "key": "user_id",
+      "value": ""
+    },
+    {
+      "key": "created_property_id",
+      "value": ""
+    }
+  ]
+}

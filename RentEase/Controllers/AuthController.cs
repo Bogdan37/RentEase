@@ -27,7 +27,6 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
-
     [HttpPost("google")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -44,10 +43,16 @@ public class AuthController : ControllerBase
             return BadRequest("Невалідний Google ID Token");
         }
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
+        var user = await _context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == payload.Email);
+
         if (user == null)
         {
-            var defaultTenant = await _context.Tenants.FirstOrDefaultAsync();
+            var defaultTenant = await _context.Tenants
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync();
+
             if (defaultTenant == null)
             {
                 defaultTenant = new Tenant { Id = Guid.NewGuid(), Name = "Default Tenant", Slug = "default" };
@@ -76,13 +81,15 @@ public class AuthController : ControllerBase
             DateTime.UtcNow.AddMinutes(120)));
     }
 
-
     [HttpPost("demo-login")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AuthResponseDto>> DemoLogin([FromBody] LoginDemoDto dto)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        var user = await _context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == dto.Email);
+
         if (user == null)
         {
             return NotFound($"Користувача з email '{dto.Email}' не знайдено.");

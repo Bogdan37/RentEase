@@ -6,11 +6,13 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using RentEase.Data;
 using RentEase.Services;
+using Microsoft.FeatureManagement;
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddFeatureManagement();
 builder.Services.AddControllersWithViews();
 builder.Services.AddEndpointsApiExplorer();
 
