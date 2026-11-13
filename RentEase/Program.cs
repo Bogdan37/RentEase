@@ -2,17 +2,19 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using RentEase.Data;
+using RentEase.Hubs;
 using RentEase.Services;
-using Microsoft.FeatureManagement;
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddFeatureManagement();
+builder.Services.AddSignalR();
 builder.Services.AddControllersWithViews();
 builder.Services.AddEndpointsApiExplorer();
 
@@ -22,7 +24,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -160,6 +163,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<BookingHub>("/hubs/bookings");
 app.MapDefaultControllerRoute();
 
 app.Run();

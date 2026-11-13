@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import * as signalR from '@microsoft/signalr';
 import {
   Building2,
   Search,
@@ -118,6 +119,7 @@ export default function App() {
 
   const [pricingPlan, setPricingPlan] = useState(null);
   const [premiumReport, setPremiumReport] = useState(null);
+  const [signalRConnected, setSignalRConnected] = useState(false);
 
   const [toast, setToast] = useState(null);
   const notify = (type, text) => {
@@ -218,6 +220,62 @@ export default function App() {
       loadBookings();
     }
   }, [activePage, session?.userId]);
+
+  // SignalR (C11): підключення до /hubs/bookings і вхід у групу поточного користувача
+  useEffect(() => {
+    if (!session?.userId) {
+      setSignalRConnected(false);
+      return;
+    }
+
+    const hubUrl =
+        (import.meta.env.VITE_API_URL || 'http://localhost:8080/api').replace(/\/api\/?$/, '') +
+        '/hubs/bookings';
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl(hubUrl)
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on('BookingCreated', (booking) => {
+      notify(
+          'success',
+          `Нове бронювання: "${booking.propertyTitle}" (${booking.startDate} — ${booking.endDate}) від ${booking.clientName}`
+      );
+      loadBookings();
+    });
+
+    connection.on('BookingStatusUpdated', (booking) => {
+      notify(
+          'success',
+          `Статус бронювання "${booking.propertyTitle}" змінено на ${booking.status}`
+      );
+      loadBookings();
+    });
+
+    connection.onreconnected(async () => {
+      setSignalRConnected(true);
+      await connection.invoke('JoinUserGroup', session.userId).catch(() => {});
+    });
+
+    connection.onclose(() => {
+      setSignalRConnected(false);
+    });
+
+    connection
+        .start()
+        .then(async () => {
+          setSignalRConnected(true);
+          await connection.invoke('JoinUserGroup', session.userId);
+        })
+        .catch(() => {
+          setSignalRConnected(false);
+        });
+
+    return () => {
+      connection.stop().catch(() => {});
+    };
+  }, [session?.userId]);
 
   const openPropertyDetails = (prop) => {
     setDetailProperty(prop);
@@ -509,6 +567,19 @@ export default function App() {
           </nav>
 
           <div className="auth-box">
+            {isAuthenticated && (
+                <span
+                    className="badge"
+                    style={{
+                      background: signalRConnected ? '#dcfce7' : '#f1f5f9',
+                      color: signalRConnected ? '#166534' : '#64748b',
+                    }}
+                    title="SignalR Real-Time підключення"
+                >
+              {signalRConnected ? '● Live (SignalR)' : '○ Offline'}
+            </span>
+            )}
+
             {isAuthenticated && role === 'Owner' && (
                 <button
                     className="btn-outline"

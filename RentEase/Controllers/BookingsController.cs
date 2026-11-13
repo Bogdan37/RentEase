@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using RentEase.Data;
 using RentEase.DTOs;
+using RentEase.Hubs;
 using RentEase.Models;
 using RentEase.Services;
 
@@ -14,11 +16,16 @@ public class BookingsController : ControllerBase
 {
     private readonly RentEaseDbContext _context;
     private readonly IMessageProducer _messageProducer;
+    private readonly IHubContext<BookingHub> _hubContext;
 
-    public BookingsController(RentEaseDbContext context, IMessageProducer messageProducer)
+    public BookingsController(
+        RentEaseDbContext context,
+        IMessageProducer messageProducer,
+        IHubContext<BookingHub> hubContext)
     {
         _context = context;
         _messageProducer = messageProducer;
+        _hubContext = hubContext;
     }
 
     [HttpPost]
@@ -113,6 +120,10 @@ public class BookingsController : ControllerBase
             booking.CreatedAt
         );
 
+        await _hubContext.Clients
+            .Group($"user_{property.OwnerId.ToString().ToLowerInvariant()}")
+            .SendAsync("BookingCreated", response, ct);
+
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, response);
     }
 
@@ -197,7 +208,7 @@ public class BookingsController : ControllerBase
         booking.Status = parsedStatus;
         await _context.SaveChangesAsync(ct);
 
-        return Ok(new BookingResponseDto(
+        var response = new BookingResponseDto(
             booking.Id,
             booking.TenantId,
             booking.PropertyId,
@@ -209,6 +220,21 @@ public class BookingsController : ControllerBase
             booking.TotalPrice,
             booking.Status.ToString(),
             booking.CreatedAt
-        ));
+        );
+
+        var targetGroups = new List<string>
+        {
+            $"user_{booking.ClientId.ToString().ToLowerInvariant()}"
+        };
+        if (booking.Property != null)
+        {
+            targetGroups.Add($"user_{booking.Property.OwnerId.ToString().ToLowerInvariant()}");
+        }
+
+        await _hubContext.Clients
+            .Groups(targetGroups.Distinct())
+            .SendAsync("BookingStatusUpdated", response, ct);
+
+        return Ok(response);
     }
 }

@@ -1,10 +1,12 @@
 ﻿using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using RentEase.Controllers;
 using RentEase.Data;
 using RentEase.DTOs;
+using RentEase.Hubs;
 using RentEase.Models;
 using RentEase.Services;
 using Xunit;
@@ -24,6 +26,14 @@ public class BookingsControllerTests
         using var context = new RentEaseDbContext(options, mockTenantProvider.Object);
 
         var mockProducer = new Mock<IMessageProducer>();
+
+        var mockHubClients = new Mock<IHubClients>();
+        var mockClientProxy = new Mock<IClientProxy>();
+        mockHubClients.Setup(c => c.Group(It.IsAny<string>())).Returns(mockClientProxy.Object);
+        mockHubClients.Setup(c => c.Groups(It.IsAny<IReadOnlyList<string>>())).Returns(mockClientProxy.Object);
+
+        var mockHubContext = new Mock<IHubContext<BookingHub>>();
+        mockHubContext.Setup(h => h.Clients).Returns(mockHubClients.Object);
 
         var ownerId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
@@ -47,7 +57,7 @@ public class BookingsControllerTests
         });
         await context.SaveChangesAsync();
 
-        var controller = new BookingsController(context, mockProducer.Object);
+        var controller = new BookingsController(context, mockProducer.Object, mockHubContext.Object);
 
         var dto = new CreateBookingDto(
             propertyId,
@@ -72,5 +82,10 @@ public class BookingsControllerTests
             It.Is<BookingCreatedEvent>(e => e.BookingId == savedBooking.Id && e.PropertyId == propertyId),
             "booking_created_queue"
         ), Times.Once);
+
+        mockHubClients.Verify(
+            c => c.Group($"user_{ownerId.ToString().ToLowerInvariant()}"),
+            Times.Once
+        );
     }
 }
