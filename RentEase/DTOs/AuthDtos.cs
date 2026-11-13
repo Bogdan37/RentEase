@@ -11,3 +11,9 @@ public record AuthResponseDto(
 );
 
 public record LoginDemoDto(string Email);
+
+public record RegisterUserDto(
+    string FullName,
+    string Email,
+    string PhoneNumber
+);

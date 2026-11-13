@@ -103,4 +103,56 @@ public class AuthController : ControllerBase
             user.FullName, 
             DateTime.UtcNow.AddMinutes(120)));
     }
+
+    [HttpPost("register")]
+    [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<AuthResponseDto>> Register([FromBody] RegisterUserDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.FullName))
+        {
+            return BadRequest("Ім'я та Email є обов'язковими.");
+        }
+
+        var normalizedEmail = dto.Email.Trim();
+        var existingUser = await _context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+
+        if (existingUser != null)
+        {
+            return BadRequest($"Користувач з email '{normalizedEmail}' вже існує. Виконайте вхід.");
+        }
+
+        var defaultTenant = await _context.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync();
+
+        if (defaultTenant == null)
+        {
+            defaultTenant = new Tenant { Id = Guid.NewGuid(), Name = "Default Tenant", Slug = "default" };
+            _context.Tenants.Add(defaultTenant);
+        }
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = normalizedEmail,
+            FullName = dto.FullName.Trim(),
+            PhoneNumber = string.IsNullOrWhiteSpace(dto.PhoneNumber) ? "+380000000000" : dto.PhoneNumber.Trim(),
+            TenantId = defaultTenant.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        var token = _tokenService.GenerateJwtToken(user);
+        return Created(string.Empty, new AuthResponseDto(
+            token,
+            user.Id,
+            user.Email,
+            user.FullName,
+            DateTime.UtcNow.AddMinutes(120)));
+    }
 }
