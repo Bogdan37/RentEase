@@ -23,8 +23,10 @@ import {
   ArrowLeft,
   Eye,
   Clock,
+  BarChart3,
 } from 'lucide-react';
 import { analyticsApi, authApi, bookingsApi, propertiesApi } from './api';
+import OwnerStatsCharts from './OwnerStatsCharts';
 import './App.css';
 
 const STORAGE_KEY = 'rentease_session';
@@ -211,7 +213,7 @@ export default function App() {
     if (activePage === 'property-details') loadBookings();
     if (activePage === 'my-bookings') loadBookings();
     if (activePage === 'my-properties') loadOwnerProperties();
-    if (activePage === 'owner-bookings') {
+    if (activePage === 'owner-bookings' || activePage === 'stats') {
       loadOwnerProperties();
       loadBookings();
     }
@@ -277,7 +279,10 @@ export default function App() {
   }, [bookings, ownerProperties]);
 
   const ownerTotalRevenue = useMemo(
-      () => ownerBookings.reduce((sum, b) => sum + Number(b.totalPrice || 0), 0),
+      () =>
+          ownerBookings
+              .filter((b) => b.status !== 'Cancelled' && b.status !== 'Rejected')
+              .reduce((sum, b) => sum + Number(b.totalPrice || 0), 0),
       [ownerBookings]
   );
 
@@ -353,6 +358,23 @@ export default function App() {
           typeof err.response?.data === 'string'
               ? err.response.data
               : 'На обрані дати житло вже зайняте або дати некоректні.';
+      notify('error', msg);
+    }
+  };
+
+  const handleChangeBookingStatus = async (bookingId, newStatus) => {
+    try {
+      await bookingsApi.updateStatus(bookingId, newStatus);
+      notify('success', `Статус бронювання змінено на "${newStatus}".`);
+      await loadBookings();
+      if (premiumReport) {
+        handleCheckPremium();
+      }
+    } catch (err) {
+      const msg =
+          typeof err.response?.data === 'string'
+              ? err.response.data
+              : 'Не вдалося оновити статус бронювання.';
       notify('error', msg);
     }
   };
@@ -471,6 +493,12 @@ export default function App() {
                     <UserCheck size={16} /> Хто забронював
                   </button>
                   <button
+                      className={activePage === 'stats' ? 'active' : ''}
+                      onClick={() => setActivePage('stats')}
+                  >
+                    <BarChart3 size={16} /> Статистика
+                  </button>
+                  <button
                       className={activePage === 'create' ? 'active' : ''}
                       onClick={() => setActivePage('create')}
                   >
@@ -531,15 +559,108 @@ export default function App() {
             </div>
         )}
 
+        {/* PREMIUM DASHBOARD (Feature Flag B6) */}
         {isAuthenticated && role === 'Owner' && premiumReport && (
-            <section className="container card premium-box">
-              <div className="row-between">
-                <h3>Преміум-аналітика дохідності (Feature Flag: PremiumAnalytics)</h3>
-                <button className="btn-text" onClick={() => setPremiumReport(null)}>
-                  Закрити
+            <section className="container card premium-dashboard">
+              <div className="row-between" style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span className="premium-icon-badge">
+                <Sparkles size={18} />
+              </span>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Преміум-аналітика власника</h3>
+                    <span className="muted" style={{ fontSize: '0.82rem' }}>
+                  Дані в реальному часі з бази • Feature Flag: <b>{premiumReport.feature}</b>
+                </span>
+                  </div>
+                </div>
+                <button className="btn-secondary" onClick={() => setPremiumReport(null)}>
+                  Закрити звіт
                 </button>
               </div>
-              <pre>{JSON.stringify(premiumReport, null, 2)}</pre>
+
+              <div className="kpi-grid">
+                <div className="kpi-card">
+                  <span className="kpi-label">Підтверджений дохід</span>
+                  <strong className="kpi-value text-green">
+                    {Number(premiumReport.confirmedRevenue || 0).toLocaleString('uk-UA')} ₴
+                  </strong>
+                  <span className="kpi-sub">
+                Очікує підтвердження:{' '}
+                    {Number(premiumReport.pendingRevenue || 0).toLocaleString('uk-UA')} ₴
+              </span>
+                </div>
+
+                <div className="kpi-card">
+                  <span className="kpi-label">Потенціал на місяць</span>
+                  <strong className="kpi-value">
+                    {Number(premiumReport.projectedMonthlyRevenue || 0).toLocaleString('uk-UA')} ₴
+                  </strong>
+                  <span className="kpi-sub">
+                Активних об'єктів: <b>{premiumReport.totalProperties}</b>
+              </span>
+                </div>
+
+                <div className="kpi-card">
+                  <span className="kpi-label">Завантаженість (30 днів)</span>
+                  <strong className="kpi-value">{premiumReport.occupancyRatePercent}%</strong>
+                  <div className="progress-track">
+                    <div
+                        className="progress-fill"
+                        style={{ width: `${Math.min(100, premiumReport.occupancyRatePercent || 0)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="kpi-card">
+                  <span className="kpi-label">Ваша ціна vs Ринок</span>
+                  <strong className="kpi-value">
+                    {premiumReport.ownerAvgDailyPrice} ₴{' '}
+                    <span className="muted" style={{ fontSize: '0.85rem', fontWeight: 400 }}>
+                  / {premiumReport.marketAvgDailyPrice} ₴
+                </span>
+                  </strong>
+                  <span className="kpi-sub">
+                Сер. тривалість оренди: <b>{premiumReport.averageStayDays} дн.</b>
+              </span>
+                </div>
+              </div>
+
+              <div className="premium-bottom-grid">
+                <div className="premium-subbox">
+                  <h4>Лідер дохідності серед ваших квартир</h4>
+                  <p style={{ margin: '6px 0 2px', fontWeight: 600 }}>
+                    {premiumReport.topPropertyTitle}
+                  </p>
+                  <span className="muted" style={{ fontSize: '0.85rem' }}>
+                Принесла:{' '}
+                    <b>{Number(premiumReport.topPropertyRevenue || 0).toLocaleString('uk-UA')} ₴</b>
+              </span>
+                </div>
+
+                <div className="premium-subbox">
+                  <h4>Найпопулярніші локації на платформі</h4>
+                  {premiumReport.topLocations?.length > 0 ? (
+                      <ul className="top-locations-list">
+                        {premiumReport.topLocations.map((loc, idx) => (
+                            <li key={idx}>
+                              <span>{loc.location}</span>
+                              <span className="badge">{loc.bookingsCount} бронюв.</span>
+                            </li>
+                        ))}
+                      </ul>
+                  ) : (
+                      <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.85rem' }}>
+                        Поки що недостатньо бронювань для рейтингу локацій.
+                      </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="premium-advice">
+                <Sparkles size={16} />
+                <span>{premiumReport.recommendation}</span>
+              </div>
             </section>
         )}
 
@@ -1002,7 +1123,19 @@ export default function App() {
                               </td>
                               <td>{b.totalPrice} ₴</td>
                               <td>
-                                <span className="badge">{b.status}</span>
+                          <span className={`badge status-${b.status.toLowerCase()}`}>
+                            {b.status}
+                          </span>
+                                {(b.status === 'Pending' || b.status === 'Confirmed') && (
+                                    <button
+                                        type="button"
+                                        className="btn-text"
+                                        style={{ marginLeft: '10px', color: '#dc2626', fontSize: '0.82rem' }}
+                                        onClick={() => handleChangeBookingStatus(b.id, 'Cancelled')}
+                                    >
+                                      Скасувати
+                                    </button>
+                                )}
                               </td>
                             </tr>
                         ))}
@@ -1120,7 +1253,16 @@ export default function App() {
                                 <b>{b.totalPrice} ₴</b>
                               </td>
                               <td>
-                                <span className="badge">{b.status}</span>
+                                <select
+                                    className={`status-select status-${b.status.toLowerCase()}`}
+                                    value={b.status}
+                                    onChange={(e) => handleChangeBookingStatus(b.id, e.target.value)}
+                                >
+                                  <option value="Pending">Pending (Очікує)</option>
+                                  <option value="Confirmed">Confirmed (Підтверджено)</option>
+                                  <option value="Rejected">Rejected (Відхилено)</option>
+                                  <option value="Cancelled">Cancelled (Скасовано)</option>
+                                </select>
                               </td>
                             </tr>
                         ))}
@@ -1129,6 +1271,14 @@ export default function App() {
                     </div>
                 )}
               </section>
+          )}
+
+          {isAuthenticated && role === 'Owner' && activePage === 'stats' && (
+              <OwnerStatsCharts
+                  ownerProperties={ownerProperties}
+                  ownerBookings={ownerBookings}
+                  allProperties={allPropertiesForOwner}
+              />
           )}
 
           {isAuthenticated && role === 'Owner' && activePage === 'create' && (

@@ -34,6 +34,7 @@ export const propertiesApi = {
 export const bookingsApi = {
     getAll: () => api.get('/Bookings'),
     create: (data) => api.post('/Bookings', data),
+    updateStatus: (id, status) => api.patch(`/Bookings/${id}/status`, { status }),
 };
 
 export const analyticsApi = {

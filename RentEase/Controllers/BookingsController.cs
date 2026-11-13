@@ -169,4 +169,46 @@ public class BookingsController : ControllerBase
             booking.CreatedAt
         ));
     }
+
+    [HttpPatch("{id:guid}/status")]
+    [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BookingResponseDto>> UpdateStatus(
+        Guid id,
+        [FromBody] UpdateBookingStatusDto dto,
+        CancellationToken ct)
+    {
+        if (!Enum.TryParse<BookingStatus>(dto.Status, ignoreCase: true, out var parsedStatus))
+        {
+            return BadRequest("Некоректний статус. Доступні значення: Pending, Confirmed, Rejected, Cancelled.");
+        }
+
+        var booking = await _context.BookingRequests
+            .Include(b => b.Property)
+            .Include(b => b.Client)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking == null)
+        {
+            return NotFound($"Бронювання з ID {id} не знайдено.");
+        }
+
+        booking.Status = parsedStatus;
+        await _context.SaveChangesAsync(ct);
+
+        return Ok(new BookingResponseDto(
+            booking.Id,
+            booking.TenantId,
+            booking.PropertyId,
+            booking.Property?.Title ?? string.Empty,
+            booking.ClientId,
+            booking.Client?.FullName ?? string.Empty,
+            booking.StartDate,
+            booking.EndDate,
+            booking.TotalPrice,
+            booking.Status.ToString(),
+            booking.CreatedAt
+        ));
+    }
 }

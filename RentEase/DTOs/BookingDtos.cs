@@ -22,3 +22,5 @@ public record BookingResponseDto(
     string Status,
     DateTime CreatedAt
 );
+
+public record UpdateBookingStatusDto(string Status);
