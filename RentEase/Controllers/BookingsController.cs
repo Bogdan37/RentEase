@@ -205,6 +205,11 @@ public class BookingsController : ControllerBase
             return NotFound($"Бронювання з ID {id} не знайдено.");
         }
 
+        if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Rejected)
+        {
+            return BadRequest($"Неможливо змінити статус бронювання, оскільки воно вже має фінальний статус '{booking.Status}'.");
+        }
+
         booking.Status = parsedStatus;
         await _context.SaveChangesAsync(ct);
 

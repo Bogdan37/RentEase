@@ -1324,16 +1324,26 @@ export default function App() {
                                 <b>{b.totalPrice} ₴</b>
                               </td>
                               <td>
-                                <select
-                                    className={`status-select status-${b.status.toLowerCase()}`}
-                                    value={b.status}
-                                    onChange={(e) => handleChangeBookingStatus(b.id, e.target.value)}
-                                >
-                                  <option value="Pending">Pending (Очікує)</option>
-                                  <option value="Confirmed">Confirmed (Підтверджено)</option>
-                                  <option value="Rejected">Rejected (Відхилено)</option>
-                                  <option value="Cancelled">Cancelled (Скасовано)</option>
-                                </select>
+                                {b.status === 'Cancelled' || b.status === 'Rejected' ? (
+                                    <span
+                                        className={`badge status-${b.status.toLowerCase()}`}
+                                        title="Фінальний статус — зміна недоступна"
+                                    >
+                              {b.status === 'Cancelled'
+                                  ? 'Cancelled (Скасовано)'
+                                  : 'Rejected (Відхилено)'}
+                            </span>
+                                ) : (
+                                    <select
+                                        className={`status-select status-${b.status.toLowerCase()}`}
+                                        value={b.status}
+                                        onChange={(e) => handleChangeBookingStatus(b.id, e.target.value)}
+                                    >
+                                      <option value="Pending">Pending (Очікує)</option>
+                                      <option value="Confirmed">Confirmed (Підтверджено)</option>
+                                      <option value="Rejected">Rejected (Відхилено)</option>
+                                    </select>
+                                )}
                               </td>
                             </tr>
                         ))}

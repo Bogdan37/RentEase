@@ -26,7 +26,6 @@ export default function OwnerStatsCharts({
                                              ownerBookings = [],
                                              allProperties = [],
                                          }) {
-    // 1. Дохід по кожній квартирі власника
     const revenueByPropertyData = useMemo(() => {
         const labels = ownerProperties.map((p) =>
             p.title.length > 22 ? p.title.slice(0, 22) + '…' : p.title
@@ -52,7 +51,6 @@ export default function OwnerStatsCharts({
         };
     }, [ownerProperties, ownerBookings]);
 
-    // 2. Розподіл бронювань за статусами
     const bookingsStatusData = useMemo(() => {
         const counts = { Confirmed: 0, Pending: 0, Cancelled: 0 };
         ownerBookings.forEach((b) => {
@@ -72,7 +70,6 @@ export default function OwnerStatsCharts({
         };
     }, [ownerBookings]);
 
-    // 3. Середня ціна за добу по містах (аналітика ринку)
     const avgPriceByCityData = useMemo(() => {
         const cityMap = new Map();
         allProperties.forEach((p) => {
